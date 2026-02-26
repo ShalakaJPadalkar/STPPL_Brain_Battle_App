@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STPPL Brain Battle</title>
+
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Arial, sans-serif;
+  background:linear-gradient(135deg,#667eea,#764ba2);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  min-height:100vh;
+  padding:15px;
+}
+.container{
+  background:white;
+  width:100%;
+  max-width:900px;
+  padding:25px;
+  border-radius:14px;
+  box-shadow:0 10px 25px rgba(0,0,0,0.2);
+}
+h1,h2,h3{margin:10px 0}
+input{
+  padding:12px;
+  width:100%;
+  border-radius:8px;
+  border:1px solid #ccc;
+  font-size:16px;
+}
+button{
+  padding:12px;
+  width:100%;
+  margin-top:10px;
+  border:none;
+  border-radius:8px;
+  font-size:16px;
+  cursor:pointer;
+  background:#667eea;
+  color:white;
+}
+button:hover{opacity:0.9}
+.option-btn{
+  background:#f4f4f4;
+  color:black;
+  border:1px solid #ddd;
+}
+.correct{background:#c8e6c9 !important}
+.wrong{background:#ffcdd2 !important}
+.top-bar{
+  display:flex;
+  justify-content:space-between;
+  font-weight:bold;
+  margin-bottom:10px;
+}
+.timer-bar{
+  height:8px;
+  background:#ddd;
+  border-radius:5px;
+  overflow:hidden;
+  margin-bottom:15px;
+}
+.timer-progress{
+  height:8px;
+  background:#4caf50;
+  width:100%;
+}
+@media(max-width:600px){
+  .container{padding:15px}
+  h1{font-size:20px}
+  button{font-size:14px}
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<div id="login">
+<h1>STPPL Brain Battle</h1>
+<input id="username" placeholder="Enter your name">
+<button onclick="startQuiz()">Start Quiz</button>
+</div>
+
+<div id="quiz" style="display:none;">
+<div class="top-bar">
+<div>Question <span id="qNumber"></span>/20</div>
+<div>⏳ <span id="timeLeft">30</span>s</div>
+</div>
+
+<div class="timer-bar">
+<div id="timerProgress" class="timer-progress"></div>
+</div>
+
+<h3 id="questionText"></h3>
+<div id="options"></div>
+
+<button id="nextBtn" onclick="nextQuestion()" style="display:none;">Next Question</button>
+</div>
+
+<div id="result" style="display:none;"></div>
+
+</div>
+
+<script>
+
+// ================= GOOGLE SHEET WEBHOOK =================
+const SHEET_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycby4wBJ7ADg93LJvJG3k4yV1LizaF4tgLOZcf-ignfUYtMBGyZw7GMGxV9QfS5nH2cVbLQ/exec";
+
+// ================= YOUR FULL 50 QUESTIONS =================
+// IMPORTANT: I am including structure only here due to length.
+// Paste your FULL 50 question array exactly as in your previous file.
+// Example format below:
+
+const QUESTION_BANK = [
+  { id: 1, difficulty: "easy", question: "Which fruit is known as the 'King of Fruits' in India? / भारतात कोणत्या फळाला 'फळांचा राजा' मानले जाते?", options: ["Apple / सफरचंद","Mango / आंबा","Banana / केळी","Grapes / द्राक्षे"], answerIndex: 1 },
+  { id: 2, difficulty: "easy", question: "Which of these is a popular street food in Mumbai? / यापैकी कोणता मुंबईतील प्रसिद्ध स्ट्रीट फूड आहे?", options: ["Pasta / पास्ता","Vada Pav / वडा पाव","Burger / बर्गर","Momos / मोमोज"], answerIndex: 1 },
+  { id: 3, difficulty: "easy", question: "In the movie 'Sholay', what was the name of Basanti's horse? / शोले चित्रपटात बसंतीच्या घोडीचे नाव काय होते?", options: ["Dhanno / धन्नो","Bijli / बिजली","Rani / राणी","Badal / बादल"], answerIndex: 0 },
+  { id: 4, difficulty: "easy", question: "How many players are there in a Cricket team on the field? / क्रिकेटच्या मैदानात एका संघात किती खेळाडू असतात?", options: ["10 / दहा","12 / बारा","11 / अकरा","9 / नऊ"], answerIndex: 2 },
+  { id: 5, difficulty: "easy", question: "Which color symbolises peace in the Indian National Flag? / भारतीय राष्ट्रध्वजात कोणता रंग शांततेचे प्रतीक आहे?", options: ["Saffron / केशरी","White / पांढरा","Green / हिरवा","Blue / निळा"], answerIndex: 1 },
+  { id: 6, difficulty: "easy", question: "Which social media platform uses a Blue Bird logo? / कोणत्या सोशल मीडिया प्लॅटफॉर्मच्या लोगोमध्ये निळा पक्षी आहे?", options: ["Facebook / फेसबुक","Instagram / इन्स्टाग्राम","Twitter (X) / ट्विटर","WhatsApp / व्हॉट्सअॅप"], answerIndex: 2 },
+  { id: 7, difficulty: "easy", question: "Who is the current Prime Minister of India? / भारताचे सध्याचे पंतप्रधान कोण आहेत?", options: ["Rahul Gandhi / राहुल गांधी","Amit Shah / अमित शाह","Narendra Modi / नरेंद्र मोदी","Nitin Gadkari / नितीन गडकरी"], answerIndex: 2 },
+  { id: 8, difficulty: "easy", question: "Which city is known as the Orange City of India? / भारतातील कोणत्या शहराला संत्र्यांचे शहर म्हणतात?", options: ["Pune / पुणे","Nagpur / नागपूर","Nashik / नाशिक","Mumbai / मुंबई"], answerIndex: 1 },
+  { id: 9, difficulty: "easy", question: "What is the full form of OTP? / OTP चा पूर्ण अर्थ काय?", options: ["Only Time Pass / फक्त टाइम पास","One Time Password / वन टाइम पासवर्ड","Over The Phone / फोनवर","Open To Public / सर्वांसाठी खुले"], answerIndex: 1 },
+  { id: 10, difficulty: "easy", question: "In which city is the Gateway of India located? / गेटवे ऑफ इंडिया कोणत्या शहरात आहे?", options: ["New Delhi / नवी दिल्ली","Kolkata / कोलकाता","Mumbai / मुंबई","Chennai / चेन्नई"], answerIndex: 2 },
+  { id: 11, difficulty: "easy", question: "Which animal is known as the Ship of the Desert? / वाळवंटातील जहाज कोणत्या प्राण्याला म्हणतात?", options: ["Horse / घोडा","Camel / उंट","Elephant / हत्ती","Donkey / गाढव"], answerIndex: 1 },
+  { id: 12, difficulty: "easy", question: "Which is the largest planet in our Solar System? / सूर्यमालेतील सर्वात मोठा ग्रह कोणता?", options: ["Earth / पृथ्वी","Mars / मंगळ","Jupiter / गुरु","Saturn / शनी"], answerIndex: 2 },
+  { id: 13, difficulty: "easy", question: "Which festival is known as the Festival of Colors? / कोणत्या सणाला रंगांचा सण म्हणतात?", options: ["Diwali / दिवाळी","Holi / होळी","Eid / ईद","Christmas / ख्रिसमस"], answerIndex: 1 },
+  { id: 14, difficulty: "easy", question: "What is the capital of Maharashtra? / महाराष्ट्राची राजधानी कोणती?", options: ["Pune / पुणे","Nagpur / नागपूर","Mumbai / मुंबई","Nashik / नाशिक"], answerIndex: 2 },
+  { id: 15, difficulty: "easy", question: "In Ludo, what is the maximum number on a dice? / लुडोमध्ये फाशावरचा सर्वात मोठा अंक कोणता?", options: ["4 / चार","10 / दहा","6 / सहा","8 / आठ"], answerIndex: 2 },
+  { id: 16, difficulty: "easy", question: "Who is known as Master Blaster in Cricket? / क्रिकेटमधील मास्टर ब्लास्टर कोण?", options: ["Virat Kohli / विराट कोहली","M.S. Dhoni / एम.एस. धोनी","Sachin Tendulkar / सचिन तेंडुलकर","Rohit Sharma / रोहित शर्मा"], answerIndex: 2 },
+  { id: 17, difficulty: "easy", question: "How many days are there in a Leap Year? / लीप वर्षात किती दिवस असतात?", options: ["365 / ३६५","360 / ३६०","366 / ३६६","364 / ३६४"], answerIndex: 2 },
+  { id: 18, difficulty: "easy", question: "Which gas do humans breathe in to survive? / मानव जिवंत राहण्यासाठी कोणता वायू घेतो?", options: ["Nitrogen / नायट्रोजन","Carbon Dioxide / कार्बन डायऑक्साइड","Oxygen / ऑक्सिजन","Hydrogen / हायड्रोजन"], answerIndex: 2 },
+  { id: 19, difficulty: "easy", question: "Which is the longest river in India? / भारतातील सर्वात लांब नदी कोणती?", options: ["Yamuna / यमुना","Godavari / गोदावरी","Ganga / गंगा","Narmada / नर्मदा"], answerIndex: 2 },
+  { id: 20, difficulty: "easy", question: "Zero was invented by which Indian mathematician? / शून्याचा शोध कोणी लावला?", options: ["Bhaskara / भास्कर","Varahamihira / वराहमिहिर","Aryabhata / आर्यभट्ट","Brahmagupta / ब्रह्मगुप्त"], answerIndex: 2 },
+  { id: 21, difficulty: "easy", question: "What is the national bird of India? / भारताचा राष्ट्रीय पक्षी कोणता?", options: ["Parrot / पोपट","Eagle / गरुड","Peacock / मोर","Sparrow / चिमणी"], answerIndex: 2 },
+  { id: 22, difficulty: "easy", question: "Which search engine is most used in the world? / जगातील सर्वाधिक वापरले जाणारे सर्च इंजिन कोणते?", options: ["Yahoo","Bing","Google","Baidu"], answerIndex: 2 },
+  { id: 23, difficulty: "easy", question: "Jana Gana Mana was originally written in which language? / जन गण मन मूळतः कोणत्या भाषेत लिहिले गेले?", options: ["Hindi / हिंदी","Marathi / मराठी","Bengali / बंगाली","Sanskrit / संस्कृत"], answerIndex: 2 },
+  { id: 24, difficulty: "easy", question: "Which vitamin do we get from Sunlight? / सूर्यप्रकाशातून कोणते जीवनसत्व मिळते?", options: ["Vitamin A","Vitamin B","Vitamin D","Vitamin C"], answerIndex: 2 },
+  { id: 25, difficulty: "easy", question: "Which mobile app is used for UPI payments? / UPI पेमेंटसाठी कोणते अॅप वापरले जाते?", options: ["Instagram","Netflix","PhonePe / Google Pay","YouTube"], answerIndex: 2 },
+  { id: 26, difficulty: "easy", question: "Who wrote the epic Ramayana? / रामायण हे महाकाव्य कोणी लिहिले?", options: ["Ved Vyas / वेद व्यास","Tulsidas / तुलसीदास","Valmiki / वाल्मीकि","Kalidas / कालिदास"], answerIndex: 2 },
+  { id: 27, difficulty: "easy", question: "What is the boiling point of water? / पाण्याचा उत्कलन बिंदू किती?", options: ["50°C","90°C","100°C","120°C"], answerIndex: 2 },
+  { id: 28, difficulty: "easy", question: "Which Indian state is famous for its backwaters? / बॅकवॉटरसाठी कोणते राज्य प्रसिद्ध आहे?", options: ["Goa","Karnataka","Kerala","Tamil Nadu"], answerIndex: 2 },
+  { id: 29, difficulty: "easy", question: "What is the currency of the USA? / अमेरिकेचे चलन काय आहे?", options: ["Euro","Pound","Dollar","Yen"], answerIndex: 2 },
+  { id: 30, difficulty: "easy", question: "Which planet is known as the Red Planet? / लाल ग्रह कोणता?", options: ["Venus","Mercury","Mars","Jupiter"], answerIndex: 2 },
+  { id: 31, difficulty: "easy", question: "Who is the author of the Harry Potter series? / हॅरी पॉटर मालिकेचे लेखक कोण?", options: ["William Shakespeare","Mark Twain","J.K. Rowling","Charles Dickens"], answerIndex: 2 },
+  { id: 32, difficulty: "easy", question: "Which part of the plant grows underground? / झाडाचा कोणता भाग जमिनीखाली वाढतो?", options: ["Flower","Leaf","Root","Fruit"], answerIndex: 2 },
+  { id: 33, difficulty: "easy", question: "How many colors are there in a Rainbow? / इंद्रधनुष्यात किती रंग असतात?", options: ["5","9","7","6"], answerIndex: 2 },
+  { id: 34, difficulty: "easy", question: "Which city is famous for its Pethas? / पेठ्यासाठी कोणते शहर प्रसिद्ध आहे?", options: ["Mathura","Delhi","Agra","Jaipur"], answerIndex: 2 },
+  { id: 35, difficulty: "easy", question: "What does SIM stand for? / SIM चा पूर्ण अर्थ काय?", options: ["Self Identity Module","Safe Information Mode","Subscriber Identity Module","Single Internal Memory"], answerIndex: 2 },
+  { id: 36, difficulty: "easy", question: "Who is known as the Iron Man of India? / भारताचे लोहपुरुष कोण?", options: ["Mahatma Gandhi","Subhash Chandra Bose","Sardar Vallabhbhai Patel","Bhagat Singh"], answerIndex: 2 },
+  { id: 37, difficulty: "easy", question: "Which state in India has the highest literacy rate? / साक्षरतेचे प्रमाण सर्वाधिक असलेले राज्य कोणते?", options: ["Bihar","Maharashtra","Kerala","Punjab"], answerIndex: 2 },
+  { id: 38, difficulty: "easy", question: "In which year did India win its first Cricket World Cup? / भारताने पहिला क्रिकेट विश्वचषक कोणत्या वर्षी जिंकला?", options: ["2011","1999","1983","1975"], answerIndex: 2 },
+
+  { id: 39, difficulty: "medium", question: "Which fort was first captured by Shivaji Maharaj? / शिवाजी महाराजांनी जिंकलेला पहिला किल्ला कोणता?", options: ["Raigad / रायगड","Torna / तोरणा","Shivneri / शिवनेरी","Pratapgad / प्रतापगड"], answerIndex: 1 },
+  { id: 40, difficulty: "medium", question: "What is the chemical symbol for Gold? / सोन्याची रासायनिक संज्ञा काय आहे?", options: ["Ag / सिल्व्हर","Au / गोल्ड","Fe / आयर्न","Gd / गॅडोलिनियम"], answerIndex: 1 },
+  { id: 41, difficulty: "medium", question: "Who was the first woman to fly into space? / अवकाशात जाणारी पहिली महिला कोण?", options: ["Kalpana Chawla / कल्पना चावला","Valentina Tereshkova / वॅलेंटिना तेरेश्कोव्हा","Sunita Williams / सुनीता विल्यम्स","Sally Ride / सॅली रायड"], answerIndex: 1 },
+  { id: 42, difficulty: "medium", question: "In which year was the Third Battle of Panipat fought? / पानिपतचे तिसरे युद्ध कोणत्या वर्षी झाले?", options: ["1526","1556","1761","1857"], answerIndex: 2 },
+  { id: 43, difficulty: "medium", question: "Which is the smallest bone in the human body? / मानवी शरीरातील सर्वात छोटे हाड कोणते?", options: ["Femur / फिमर","Stapes / स्टेप्स","Radius / रेडियस","Skull / कवटी"], answerIndex: 1 },
+  { id: 44, difficulty: "medium", question: "Who was the first Indian to win a Nobel Prize? / पहिले भारतीय नोबेल विजेते कोण?", options: ["C.V. Raman / सी.व्ही. रमण","Mother Teresa / मदर तेरेसा","Rabindranath Tagore / रवींद्रनाथ टागोर","Amartya Sen / अमर्त्य सेन"], answerIndex: 2 },
+  { id: 45, difficulty: "medium", question: "What is the capital of Australia? / ऑस्ट्रेलियाची राजधानी कोणती?", options: ["Sydney / सिडनी","Melbourne / मेलबर्न","Canberra / कॅनबेरा","Perth / पर्थ"], answerIndex: 2 },
+  { id: 46, difficulty: "medium", question: "Which fundamental right was removed from the Indian Constitution? / भारतीय राज्यघटनेतून कोणता मूलभूत अधिकार काढून टाकला?", options: ["Right to Education / शिक्षणाचा हक्क","Right to Property / मालमत्तेचा हक्क","Right to Speech / अभिव्यक्ती स्वातंत्र्य","Right to Religion / धर्मस्वातंत्र्य"], answerIndex: 1 },
+  { id: 47, difficulty: "medium", question: "Who invented the Telephone? / टेलिफोनचा शोध कोणी लावला?", options: ["Thomas Edison / थॉमस एडिसन","Alexander Graham Bell / अलेक्झांडर ग्रॅहम बेल","Nikola Tesla / निकोला टेस्ला","Isaac Newton / आयझॅक न्यूटन"], answerIndex: 1 },
+  { id: 48, difficulty: "medium", question: "Statue of Unity is situated on the banks of which river? / स्टॅच्यू ऑफ युनिटी कोणत्या नदीच्या काठी आहे?", options: ["Ganga / गंगा","Yamuna / यमुना","Narmada / नर्मदा","Godavari / गोदावरी"], answerIndex: 2 },
+  { id: 49, difficulty: "medium", question: "Which blood group is known as the Universal Donor? / युनिव्हर्सल डोनर रक्तगट कोणता?", options: ["AB+","O Negative / O-","A+","B-"], answerIndex: 1 },
+  { id: 50, difficulty: "medium", question: "Who was the first President of Independent India? / स्वतंत्र भारताचे पहिले राष्ट्रपती कोण थे?", options: ["Mahatma Gandhi / महात्मा गांधी","Jawaharlal Nehru / जवाहरलाल नेहरू","Dr. Rajendra Prasad / डॉ. राजेंद्र प्रसाद","Sardar Vallabhbhai Patel / सरदार वल्लभभाई पटेल"], answerIndex: 2 }
+];
+
+// ================= QUIZ LOGIC =================
+
+let selectedQuestions=[];
+let currentIndex=0;
+let selected=null;
+let score=0;
+let timeLeft=30;
+let totalTime=0;
+let timer;
+let userName="";
+
+function shuffle(arr){
+  return arr.sort(()=>Math.random()-0.5);
+}
+
+function startQuiz(){
+  userName=document.getElementById("username").value.trim();
+  if(!userName){alert("Please enter your name");return;}
+
+  const easy = QUESTION_BANK.filter(q=>q.difficulty==="easy");
+  const medium = QUESTION_BANK.filter(q=>q.difficulty==="medium");
+
+  const selectedEasy = shuffle(easy).slice(0,15);
+  const selectedMedium = shuffle(medium).slice(0,5);
+
+  selectedQuestions = shuffle([...selectedEasy,...selectedMedium]);
+
+  document.getElementById("login").style.display="none";
+  document.getElementById("quiz").style.display="block";
+
+  loadQuestion();
+}
+
+function loadQuestion(){
+  selected=null;
+  timeLeft=30;
+  updateTimerUI();
+  document.getElementById("nextBtn").style.display="none";
+
+  const q=selectedQuestions[currentIndex];
+
+  document.getElementById("qNumber").innerText=currentIndex+1;
+  document.getElementById("questionText").innerText=q.question;
+
+  const optionsDiv=document.getElementById("options");
+  optionsDiv.innerHTML="";
+
+  q.options.forEach((opt,i)=>{
+    const btn=document.createElement("button");
+    btn.innerText=opt;
+    btn.className="option-btn";
+    btn.onclick=()=>selectOption(i,btn);
+    optionsDiv.appendChild(btn);
+  });
+
+  timer=setInterval(()=>{
+    timeLeft--;
+    totalTime++;
+    updateTimerUI();
+    if(timeLeft<=0){
+      clearInterval(timer);
+      nextQuestion();
+    }
+  },1000);
+}
+
+function updateTimerUI(){
+  document.getElementById("timeLeft").innerText=timeLeft;
+  document.getElementById("timerProgress").style.width=(timeLeft/30*100)+"%";
+}
+
+function selectOption(index,btn){
+  if(selected!==null) return;
+  selected=index;
+  clearInterval(timer);
+
+  const correctAnswer=selectedQuestions[currentIndex].answerIndex;
+
+  if(index===correctAnswer){
+    btn.classList.add("correct");
+    score++;
+  }else{
+    btn.classList.add("wrong");
+    document.querySelectorAll(".option-btn")[correctAnswer].classList.add("correct");
+  }
+
+  document.getElementById("nextBtn").style.display="block";
+}
+
+function nextQuestion(){
+  clearInterval(timer);
+
+  if(currentIndex+1>=selectedQuestions.length){
+    finishQuiz();
+    return;
+  }
+
+  currentIndex++;
+  loadQuestion();
+}
+
+async function finishQuiz(){
+
+  document.getElementById("quiz").style.display="none";
+  document.getElementById("result").style.display="block";
+
+  const avgTime=(totalTime/20).toFixed(1);
+  const finalScore=Math.round(score*10-avgTime);
+
+  document.getElementById("result").innerHTML=
+  `<h2>Quiz Completed 🎉</h2>
+   <p>Name: ${userName}</p>
+   <p>Correct: ${score}/20</p>
+   <p>Score: ${finalScore}</p>
+   <p>Average Time: ${avgTime}s</p>
+   <p>Logging out in 5 seconds...</p>`;
+
+  await fetch(SHEET_WEBHOOK_URL,{
+    method:"POST",
+    mode:"no-cors",
+    body: JSON.stringify({
+      name:userName,
+      correct:score,
+      total:20,
+      score:finalScore,
+      avgTime:avgTime,
+      timestamp:new Date().toISOString()
+    })
+  });
+
+  setTimeout(()=>location.reload(),5000);
+}
+
+</script>
+</body>
+</html>
